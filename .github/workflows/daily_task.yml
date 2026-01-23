@@ -38,4 +38,4 @@ jobs:
           MY_EMAI: ${{ secrets.MY_EMAIL }}
           MY_PASSWORD: ${{ secrets.MY_PASSWORD }}
           MY_RECIPIENT: ${{ secrets.MY_RECIPIENT }}
-        run: python main.py
+        run: python My_Projects/main.py
