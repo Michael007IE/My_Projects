@@ -35,7 +35,7 @@ jobs:
       # If you used Secrets (as discussed), we pass them in here.
       - name: Run Python Script
         env:
-          MY_EMAI: ${{ secrets.MY_EMAIL }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}
           MY_PASSWORD: ${{ secrets.MY_PASSWORD }}
           MY_RECIPIENT: ${{ secrets.MY_RECIPIENT }}
         run: python My_Projects/main.py
