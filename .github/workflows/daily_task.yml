@@ -1,0 +1,41 @@
+name: Daily Python Task
+
+# This defines when the script runs
+on:
+  schedule:
+    # This runs at 8:00 AM UTC every day.
+    # Note: GitHub uses UTC time. You may need to adjust this for your timezone.
+    # Format is 'minute hour day month day-of-week'
+    - cron: '0 8 * * *'
+  
+  # This allows you to manually run the script from the "Actions" tab for testing
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the code from your private repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # You can change this to 3.9 or 3.11 etc.
+
+      # Step 3: Install libraries (if you have them)
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # Step 4: Run your script
+      # If you used Secrets (as discussed), we pass them in here.
+      - name: Run Python Script
+        env:
+          MY_EMAI: ${{ secrets.MY_EMAIL }}
+          MY_PASSWORD: ${{ secrets.MY_PASSWORD }}
+          MY_RECIPIENT: ${{ secrets.MY_RECIPIENT }}
+        run: python main.py
