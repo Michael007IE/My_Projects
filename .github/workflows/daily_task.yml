@@ -40,7 +40,9 @@ jobs:
       # If you used Secrets (as discussed), we pass them in here.
       - name: Run Python Script
         env:
-          MY_EMAIL: ${{ secrets.MY_EMAIL }}
+          # The Left side is what Python sees (os.environ.get)
+          # The Right side is what you saved in GitHub Secrets
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}        
           MY_PASSWORD: ${{ secrets.MY_PASSWORD }}
-          MY_RECIPIENT: ${{ secrets.MY_RECIPIENT }}
+          MY_RECIPIENT: ${{ secrets.MY_RECIPIENT }} 
         run: python main.py
