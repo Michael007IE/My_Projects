@@ -6,7 +6,7 @@ on:
     # This runs at 8:00 AM UTC every day.
     # Note: GitHub uses UTC time. You may need to adjust this for your timezone.
     # Format is 'minute hour day month day-of-week'
-    - cron: '0 5 * * *'
+    - cron: '*/15 * * * *'
   
   # This allows you to manually run the script from the "Actions" tab for testing
   workflow_dispatch:
