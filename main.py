@@ -4,35 +4,49 @@ import yfinance as yf
 import pandas as pd
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # --- CONFIGURATION ---
 SENDER_EMAIL = os.environ.get('MY_EMAIL')
 SENDER_PASSWORD = os.environ.get('MY_PASSWORD')
 RECIPIENT_EMAIL = os.environ.get('MY_RECIPIENT')
 
-# REMOVED: ANSS, ATVI (Delisted)
-TICKERS = [
-    "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "GOOG", "META", "TSLA", "AVGO", "PEP",
-    "COST", "CSCO", "TMUS", "CMCSA", "TXN", "ADBE", "QCOM", "AMD", "NFLX", "INTC",
-    "HON", "AMGN", "INTU", "SBUX", "GILD", "MDLZ", "BKNG", "ADI", "ISRG", "ADP",
-    "REGN", "PYPL", "VRTX", "FISV", "LRCX", "MELI", "MNST", "PANW", "ORLY",
-    "KLAC", "SNPS", "CDNS", "CHTR", "MAR", "CSX", "ABNB", "NXPI", "ASML", "LULU",
-    "AEP", "KDP", "ADSK", "CTAS", "KHC", "DXCM", "BIIB", "EXC", "PAYX", "IDXX",
-    "MCHP", "MRVL", "EA", "XEL", "WDAY", "PCAR", "ROST", "CTSH", "ILMN", "ODFL",
-    "FAST", "CPRT", "DLTR", "BKR", "GFS", "WBD", "CSGP", "SIRI", "VRSK", "ALGN",
-    "EBAY", "FANG", "ENPH", "TEAM", "ZM", "ZS", "CRWD", "DDOG", "SWKS"
-]
+# Mapping Tickers to Names
+# I have pre-filled the names for the tickers you provided.
+TICKERS = {
+    "AAPL": "Apple Inc.", "MSFT": "Microsoft Corp", "AMZN": "Amazon.com", "NVDA": "NVIDIA Corp",
+    "GOOGL": "Alphabet Inc. (A)", "GOOG": "Alphabet Inc. (C)", "META": "Meta Platforms", "TSLA": "Tesla Inc.",
+    "AVGO": "Broadcom Inc.", "PEP": "PepsiCo", "COST": "Costco Wholesale", "CSCO": "Cisco Systems",
+    "TMUS": "T-Mobile US", "CMCSA": "Comcast Corp", "TXN": "Texas Instruments", "ADBE": "Adobe Inc.",
+    "QCOM": "Qualcomm Inc.", "AMD": "Advanced Micro Devices", "NFLX": "Netflix Inc.", "INTC": "Intel Corp",
+    "HON": "Honeywell Intl", "AMGN": "Amgen Inc.", "INTU": "Intuit Inc.", "SBUX": "Starbucks Corp",
+    "GILD": "Gilead Sciences", "MDLZ": "Mondelez Intl", "BKNG": "Booking Holdings", "ADI": "Analog Devices",
+    "ISRG": "Intuitive Surgical", "ADP": "ADP", "REGN": "Regeneron Pharm", "PYPL": "PayPal Holdings",
+    "VRTX": "Vertex Pharm", "FISV": "Fiserv Inc.", "LRCX": "Lam Research", "MELI": "MercadoLibre",
+    "MNST": "Monster Beverage", "PANW": "Palo Alto Networks", "ORLY": "O'Reilly Automotive", "KLAC": "KLA Corp",
+    "SNPS": "Synopsys Inc.", "CDNS": "Cadence Design", "CHTR": "Charter Comm", "MAR": "Marriott Intl",
+    "CSX": "CSX Corp", "ABNB": "Airbnb Inc.", "NXPI": "NXP Semiconductors", "ASML": "ASML Holding",
+    "LULU": "Lululemon Athletica", "AEP": "American Electric Power", "KDP": "Keurig Dr Pepper",
+    "ADSK": "Autodesk Inc.", "CTAS": "Cintas Corp", "KHC": "Kraft Heinz", "DXCM": "DexCom Inc.",
+    "BIIB": "Biogen Inc.", "EXC": "Exelon Corp", "PAYX": "Paychex Inc.", "IDXX": "IDEXX Labs",
+    "MCHP": "Microchip Tech", "MRVL": "Marvell Tech", "EA": "Electronic Arts", "XEL": "Xcel Energy",
+    "WDAY": "Workday Inc.", "PCAR": "PACCAR Inc", "ROST": "Ross Stores", "CTSH": "Cognizant Tech",
+    "ILMN": "Illumina Inc.", "ODFL": "Old Dominion Freight", "FAST": "Fastenal Co", "CPRT": "Copart Inc.",
+    "DLTR": "Dollar Tree", "BKR": "Baker Hughes", "GFS": "GlobalFoundries", "WBD": "Warner Bros. Discovery",
+    "CSGP": "CoStar Group", "SIRI": "Sirius XM", "VRSK": "Verisk Analytics", "ALGN": "Align Tech",
+    "EBAY": "eBay Inc.", "FANG": "Diamondback Energy", "ENPH": "Enphase Energy", "TEAM": "Atlassian Corp",
+    "ZM": "Zoom Video", "ZS": "Zscaler Inc.", "CRWD": "CrowdStrike", "DDOG": "Datadog Inc.", "SWKS": "Skyworks Solutions"
+}
 
-def get_stock_data(tickers):
+def get_stock_data(ticker_map):
     """
     Downloads history for all tickers.
-    FIX: Added 'auto_adjust=True' and changed 'Adj Close' to 'Close'.
+    We pass the list of keys (symbols) to yfinance.
     """
     print("Fetching stock data...")
+    symbols = list(ticker_map.keys())
     # 'auto_adjust=True' ensures we get the split/dividend adjusted price.
-    # The column name for this is now 'Close', not 'Adj Close'.
-    data = yf.download(tickers, period="3mo", auto_adjust=True, progress=False)['Close']
+    data = yf.download(symbols, period="3mo", auto_adjust=True, progress=False)['Close']
     return data
 
 def calculate_top_performers(data, days_lookback):
@@ -42,7 +56,6 @@ def calculate_top_performers(data, days_lookback):
     if len(data) < days_lookback:
         return pd.DataFrame() 
 
-    # .iloc[-1] is the most recent day, .iloc[-X] is X days ago
     current_price = data.iloc[-1]
     past_price = data.iloc[-days_lookback]
     
@@ -53,7 +66,7 @@ def calculate_top_performers(data, days_lookback):
     df = pct_change.to_frame(name='% Increase')
     df.index.name = 'Name of Stock'
     
-    # Drop NaNs (tickers that didn't exist back then)
+    # Drop NaNs
     df = df.dropna()
     
     # Sort descending
@@ -61,6 +74,11 @@ def calculate_top_performers(data, days_lookback):
     
     # Take top 10
     top_10 = df.head(10).reset_index()
+
+    # --- THIS IS THE FIX ---
+    # Replace the Ticker Symbol with the Full Name from our Dictionary
+    # If a name isn't found (e.g. you added a new stock), it falls back to the ticker
+    top_10['Name of Stock'] = top_10['Name of Stock'].map(TICKERS).fillna(top_10['Name of Stock'])
     
     # Add Rank column
     top_10.insert(0, 'Rank', range(1, 11))
@@ -120,7 +138,7 @@ def main():
 
         send_email(email_body)
     except Exception as e:
-        print(f"An error occurred in main execution: {e}")
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
