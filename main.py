@@ -12,7 +12,6 @@ SENDER_PASSWORD = os.environ.get('MY_PASSWORD')
 RECIPIENT_EMAIL = os.environ.get('MY_RECIPIENT')
 
 # Mapping Tickers to Names
-# I have pre-filled the names for the tickers you provided.
 TICKERS = {
     "AAPL": "Apple Inc.", "MSFT": "Microsoft Corp", "AMZN": "Amazon.com", "NVDA": "NVIDIA Corp",
     "GOOGL": "Alphabet Inc. (A)", "GOOG": "Alphabet Inc. (C)", "META": "Meta Platforms", "TSLA": "Tesla Inc.",
@@ -41,17 +40,18 @@ TICKERS = {
 def get_stock_data(ticker_map):
     """
     Downloads history for all tickers.
-    We pass the list of keys (symbols) to yfinance.
+    Extended period to 6mo to ensure we have enough trading days for the 90-day lookback.
     """
     print("Fetching stock data...")
     symbols = list(ticker_map.keys())
-    # 'auto_adjust=True' ensures we get the split/dividend adjusted price.
-    data = yf.download(symbols, period="3mo", auto_adjust=True, progress=False)['Close']
+    data = yf.download(symbols, period="6mo", auto_adjust=True, progress=False)['Close']
     return data
 
-def calculate_top_performers(data, days_lookback):
+def calculate_performance(data, days_lookback, is_top=True):
     """
-    Calculates % increase over the lookback period and returns the top 10.
+    Calculates % change over the lookback period. 
+    If is_top is True, returns top 10 increases.
+    If is_top is False, returns top 10 decliners.
     """
     if len(data) < days_lookback:
         return pd.DataFrame() 
@@ -63,28 +63,26 @@ def calculate_top_performers(data, days_lookback):
     pct_change = ((current_price - past_price) / past_price) * 100
     
     # Create DataFrame
-    df = pct_change.to_frame(name='% Increase')
+    df = pct_change.to_frame(name='% Change')
     df.index.name = 'Name of Stock'
     
     # Drop NaNs
     df = df.dropna()
     
-    # Sort descending
-    df = df.sort_values(by='% Increase', ascending=False)
+    # Sort: Descending for top performers, Ascending for top decliners
+    df = df.sort_values(by='% Change', ascending=not is_top)
     
     # Take top 10
     top_10 = df.head(10).reset_index()
 
-    # --- THIS IS THE FIX ---
     # Replace the Ticker Symbol with the Full Name from our Dictionary
-    # If a name isn't found (e.g. you added a new stock), it falls back to the ticker
     top_10['Name of Stock'] = top_10['Name of Stock'].map(TICKERS).fillna(top_10['Name of Stock'])
     
     # Add Rank column
     top_10.insert(0, 'Rank', range(1, 11))
     
     # Format to 2 decimal places
-    top_10['% Increase'] = top_10['% Increase'].map('{:,.2f}%'.format)
+    top_10['% Change'] = top_10['% Change'].map('{:,.2f}%'.format)
     
     return top_10
 
@@ -104,7 +102,7 @@ def send_email(html_content):
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = RECIPIENT_EMAIL
-    msg['Subject'] = f"Weekly Nasdaq Top Performers - {datetime.now().strftime('%Y-%m-%d')}"
+    msg['Subject'] = f"Weekly Nasdaq Performance Report - {datetime.now().strftime('%Y-%m-%d')}"
 
     msg.attach(MIMEText(html_content, 'html'))
 
@@ -122,18 +120,32 @@ def main():
     try:
         data = get_stock_data(TICKERS)
         
-        periods = [
+        # Define periods (Trading Days, Title String)
+        # Assuming: 5 days = 5 trading days, 30 calendar days ≈ 21 trading days, 90 calendar days ≈ 63 trading days
+        performers_periods = [
             (5, "Table 1: Top 10 Performing Stocks (Past 5 Trading Days)"),
-            (10, "Table 2: Top 10 Performing Stocks (Past 10 Trading Days)"),
-            (21, "Table 3: Top 10 Performing Stocks (Past ~30 Calendar Days)"),
-            (42, "Table 4: Top 10 Performing Stocks (Past ~60 Calendar Days)")
+            (21, "Table 2: Top 10 Performing Stocks (Past ~30 Calendar Days)"),
+            (63, "Table 3: Top 10 Performing Stocks (Past ~90 Calendar Days)")
+        ]
+        
+        decliners_periods = [
+            (5, "Table 4: Top 10 Declining Stocks (Past 5 Trading Days)"),
+            (21, "Table 5: Top 10 Declining Stocks (Past ~30 Calendar Days)"),
+            (63, "Table 6: Top 10 Declining Stocks (Past ~90 Calendar Days)")
         ]
         
         email_body = "<h2>Weekly Nasdaq Performance Report</h2>"
         
-        for days, title in periods:
-            top_stocks = calculate_top_performers(data, days)
+        # Generate Top Performers Tables
+        for days, title in performers_periods:
+            top_stocks = calculate_performance(data, days, is_top=True)
             email_body += dataframe_to_html(top_stocks, title)
+            email_body += "<br><hr><br>"
+
+        # Generate Top Decliners Tables
+        for days, title in decliners_periods:
+            declining_stocks = calculate_performance(data, days, is_top=False)
+            email_body += dataframe_to_html(declining_stocks, title)
             email_body += "<br><hr><br>"
 
         send_email(email_body)
