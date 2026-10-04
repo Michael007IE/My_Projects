@@ -11,6 +11,12 @@ SENDER_EMAIL = os.environ.get('MY_EMAIL')
 SENDER_PASSWORD = os.environ.get('MY_PASSWORD')
 RECIPIENT_EMAIL = os.environ.get('MY_RECIPIENT')
 
+# Mapping Benchmark Tickers to Names
+BENCHMARK_TICKERS = {
+    "LYMS.DE": "Amundi Core Nasdaq-100 Swap UCITS ETF",
+    "QDVE.DE": "iShares S&P 500 Info Tech Sector UCITS ETF"
+}
+
 # Mapping Tickers to Names
 TICKERS = {
     "AAPL": "Apple Inc.", "MSFT": "Microsoft Corp", "AMZN": "Amazon.com", "NVDA": "NVIDIA Corp",
@@ -39,13 +45,36 @@ TICKERS = {
 
 def get_stock_data(ticker_map):
     """
-    Downloads history for all tickers.
-    Extended period to 6mo to ensure we have enough trading days for the 90-day lookback.
+    Downloads history for all tickers in ticker_map.
     """
     print("Fetching stock data...")
     symbols = list(ticker_map.keys())
     data = yf.download(symbols, period="6mo", auto_adjust=True, progress=False)['Close']
     return data
+
+def calculate_benchmark_performance(benchmark_data, periods, benchmark_map):
+    """
+    Generates a comparison table for benchmark ETFs with columns for each lookback period.
+    """
+    rows = []
+    for ticker, name in benchmark_map.items():
+        if ticker not in benchmark_data.columns:
+            continue
+            
+        series = benchmark_data[ticker].dropna()
+        row = {"Benchmark": name, "Ticker": ticker}
+        
+        for days, col_name in periods:
+            if len(series) >= days:
+                current_price = series.iloc[-1]
+                past_price = series.iloc[-days]
+                pct_change = ((current_price - past_price) / past_price) * 100
+                row[col_name] = f"{pct_change:,.2f}%"
+            else:
+                row[col_name] = "N/A"
+        rows.append(row)
+
+    return pd.DataFrame(rows)
 
 def calculate_performance(data, days_lookback, is_top=True):
     """
@@ -59,29 +88,16 @@ def calculate_performance(data, days_lookback, is_top=True):
     current_price = data.iloc[-1]
     past_price = data.iloc[-days_lookback]
     
-    # Calculate percentage change
     pct_change = ((current_price - past_price) / past_price) * 100
     
-    # Create DataFrame
     df = pct_change.to_frame(name='% Change')
     df.index.name = 'Name of Stock'
-    
-    # Drop NaNs
     df = df.dropna()
-    
-    # Sort: Descending for top performers, Ascending for top decliners
     df = df.sort_values(by='% Change', ascending=not is_top)
     
-    # Take top 10
     top_10 = df.head(10).reset_index()
-
-    # Replace the Ticker Symbol with the Full Name from our Dictionary
     top_10['Name of Stock'] = top_10['Name of Stock'].map(TICKERS).fillna(top_10['Name of Stock'])
-    
-    # Add Rank column
     top_10.insert(0, 'Rank', range(1, 11))
-    
-    # Format to 2 decimal places
     top_10['% Change'] = top_10['% Change'].map('{:,.2f}%'.format)
     
     return top_10
@@ -102,7 +118,7 @@ def send_email(html_content):
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = RECIPIENT_EMAIL
-    msg['Subject'] = f"Weekly Nasdaq Performance Report - {datetime.now().strftime('%Y-%m-%d')}"
+    msg['Subject'] = f"Weekly Nasdaq & Benchmark Performance Report - {datetime.now().strftime('%Y-%m-%d')}"
 
     msg.attach(MIMEText(html_content, 'html'))
 
@@ -118,10 +134,20 @@ def send_email(html_content):
 
 def main():
     try:
+        # Define trading day horizons: 5 days, ~30 days (21 trading), ~90 days (63 trading)
+        benchmark_horizons = [
+            (5, "5 Trading Days"),
+            (21, "~30 Calendar Days"),
+            (63, "~90 Calendar Days")
+        ]
+
+        # 1. Fetch & Build Benchmark Table
+        benchmark_data = get_stock_data(BENCHMARK_TICKERS)
+        benchmark_df = calculate_benchmark_performance(benchmark_data, benchmark_horizons, BENCHMARK_TICKERS)
+
+        # 2. Fetch Stock Data
         data = get_stock_data(TICKERS)
         
-        # Define periods (Trading Days, Title String)
-        # Assuming: 5 days = 5 trading days, 30 calendar days ≈ 21 trading days, 90 calendar days ≈ 63 trading days
         performers_periods = [
             (5, "Table 1: Top 10 Performing Stocks (Past 5 Trading Days)"),
             (21, "Table 2: Top 10 Performing Stocks (Past ~30 Calendar Days)"),
@@ -134,15 +160,19 @@ def main():
             (63, "Table 6: Top 10 Declining Stocks (Past ~90 Calendar Days)")
         ]
         
-        email_body = "<h2>Weekly Nasdaq Performance Report</h2>"
+        email_body = "<h2>Weekly Nasdaq & Benchmark Performance Report</h2>"
         
-        # Generate Top Performers Tables
+        # Benchmark Table at Top
+        email_body += dataframe_to_html(benchmark_df, "Benchmark ETF Overview")
+        email_body += "<br><hr><br>"
+
+        # Top Performers Tables
         for days, title in performers_periods:
             top_stocks = calculate_performance(data, days, is_top=True)
             email_body += dataframe_to_html(top_stocks, title)
             email_body += "<br><hr><br>"
 
-        # Generate Top Decliners Tables
+        # Top Decliners Tables
         for days, title in decliners_periods:
             declining_stocks = calculate_performance(data, days, is_top=False)
             email_body += dataframe_to_html(declining_stocks, title)
