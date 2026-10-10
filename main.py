@@ -14,7 +14,7 @@ RECIPIENT_EMAIL = os.environ.get('MY_RECIPIENT')
 # Mapping Benchmark Tickers to Names
 BENCHMARK_TICKERS = {
     "LYMS.DE": "Amundi Core Nasdaq-100 Swap UCITS ETF",
-    "QDVE.DE": "iShares S&P 500 Info Tech Sector UCITS ETF"
+    "QDVE.DE": "iShares S&P 500 Info Tech Sector UCITS ETF",
     "AUM5.DE": "Amundi S&P 500 Swap UCITS ETF"
 }
 
